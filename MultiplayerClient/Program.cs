@@ -54,6 +54,8 @@ public static class Program
         //input handling
         HandleNavigation(ref gameState.Camera);
 
+        HandleNetworkMessages(gameState);
+
         HandleTilePlacement(gameState);
 
         //drawing
@@ -68,6 +70,26 @@ public static class Program
         Raylib.EndMode2D();
 
         Raylib.EndDrawing();
+    }
+
+    private static void HandleNetworkMessages(GameState gameState)
+    {
+        while (gameState.Server.MessagesToProcess.TryTake(out var message))
+        {
+            var idx = gameState.Tiles.FindIndex(x => x.Position == message.Tile);
+
+            if (idx == -1 && message.Enabled)
+            {
+                gameState.Tiles.Add(new Tile
+                {
+                    Position = message.Tile
+                });
+            }
+            else if(idx != -1 && !message.Enabled)
+            {
+                gameState.Tiles.RemoveAt(idx);
+            }
+        }
     }
 
     private static void DrawWorld(GameState gameState)
@@ -96,7 +118,7 @@ public static class Program
                 {
                     Position = clickedTile
                 });
-                gameState.Server.Messages.Add(new Message
+                gameState.Server.MessagesToSend.Add(new Message
                 {
                     Tile = clickedTile,
                     Enabled = true
@@ -105,7 +127,7 @@ public static class Program
             else
             {
                 gameState.Tiles.RemoveAt(idx);
-                gameState.Server.Messages.Add(new Message
+                gameState.Server.MessagesToSend.Add(new Message
                 {
                     Tile = clickedTile,
                     Enabled = false

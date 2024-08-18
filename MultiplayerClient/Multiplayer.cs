@@ -8,26 +8,14 @@ namespace MultiplayerClient;
 
 public class Server
 {
-    public required BlockingCollection<Message> Messages;
+    public required BlockingCollection<Message> MessagesToSend;
+    public required ConcurrentBag<Message> MessagesToProcess;
+    public required TcpClient TcpClient;
 }
 
 public static class Multiplayer
 {
     public static Server Run()
-    {
-        var server = new Server
-        {
-            Messages = new BlockingCollection<Message>()
-        };
-        var thread = new Thread(() => RunThread(server))
-        {
-            IsBackground = true
-        };
-        thread.Start();
-        return server;
-    }
-
-    private static void RunThread(Server server)
     {
         var ipEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 51234);
 
@@ -35,18 +23,48 @@ public static class Multiplayer
 
         tcpClient.Connect(ipEndpoint);
 
-        var stream = tcpClient.GetStream();
-        var writer = new StreamWriter(stream);
+        var server = new Server
+        {
+            MessagesToSend = new BlockingCollection<Message>(),
+            MessagesToProcess = new ConcurrentBag<Message>(),
+            TcpClient = tcpClient
+        };
 
+        //send
+        var sendThread = new Thread(() => SendMessageThread(server))
+        {
+            IsBackground = true
+        };
+        sendThread.Start();
+
+        //listen
+        var listenThread = new Thread(() => ReceiveMessageThread(server))
+        {
+            IsBackground = true
+        };
+        listenThread.Start();
+
+        return server;
+    }
+
+    private static unsafe void ReceiveMessageThread(Server server)
+    {
         while (true)
         {
-            var message = server.Messages.Take();
+            var message = Networking.GetNextMessage(server.TcpClient).GetAwaiter().GetResult();
+            server.MessagesToProcess.Add(message);
+        }
+    }
+
+    private static unsafe void SendMessageThread(Server server)
+    {
+        while (true)
+        {
+            var message = server.MessagesToSend.Take();
 
             Console.WriteLine($"Sending message {message}");
 
-            var binaryMessage = MemoryPackSerializer.Serialize(message);
-
-            writer.Write(binaryMessage);
+            Networking.SendMessage(server.TcpClient, message);
         }
     }
 }

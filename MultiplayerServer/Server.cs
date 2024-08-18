@@ -33,20 +33,31 @@ public class Server
 
             clients.Add(client);
 
-            ListenForMessages(client).ContinueWith(_ => clients.Remove(client));
+            ListenForMessages(clients, client).ContinueWith(_ => clients.Remove(client));
         }
     }
 
-    private static async Task ListenForMessages(Client client)
+    private static async Task ListenForMessages(List<Client> clients, Client client)
     {
-        var stream = client.TcpClient.GetStream();
+        Console.WriteLine("Listening for messages");
 
         while (client.TcpClient.Connected)
         {
-            var message = await MemoryPackSerializer.DeserializeAsync<Message>(stream);
+            var message = await Networking.GetNextMessage(client.TcpClient);
+
             Console.WriteLine($"Got the message: {message}");
+
+            PublishMessageToClients(message, clients);
         }
 
         Console.WriteLine("Stop listening for messages");
+    }
+
+    private static void PublishMessageToClients(Message message, List<Client> clients)
+    {
+        foreach (var client in clients)
+        {
+            Networking.SendMessage(client.TcpClient, message);
+        }
     }
 }
