@@ -38,7 +38,7 @@ public static class Program
         };
 
         Raylib.SetConfigFlags(ConfigFlags.FLAG_WINDOW_RESIZABLE);
-        Raylib.InitWindow(1800, 900, "MultiplayerExperiment");
+        Raylib.InitWindow(900, 450, "MultiplayerExperiment");
         Raylib.SetTargetFPS(60);
 
         //Main loop

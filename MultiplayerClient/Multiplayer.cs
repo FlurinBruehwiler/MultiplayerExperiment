@@ -2,7 +2,6 @@
 using System.Net;
 using System.Net.Sockets;
 using Common;
-using MemoryPack;
 
 namespace MultiplayerClient;
 

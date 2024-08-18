@@ -1,0 +1,23 @@
+name: dotnet package
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0.x
+      - name: Publish Server
+        run: dotnet publish .\MultiplayerServer\MultiplayerServer.csproj -r linux-x64 -o publish
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-release
+          path: |
+            publish/*.exe
