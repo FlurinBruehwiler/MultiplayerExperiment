@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiplayerClient", "MultiplayerClient\MultiplayerClient.csproj", "{7E28B061-0E3E-4215-A87A-5BCBBD327DF9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiplayerServer", "MultiplayerServer\MultiplayerServer.csproj", "{F851091F-DF83-4D6F-B2F2-D709C962B6BF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{AB788CD9-AC80-4890-ABFA-79BCAF30B0D9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7E28B061-0E3E-4215-A87A-5BCBBD327DF9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E28B061-0E3E-4215-A87A-5BCBBD327DF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E28B061-0E3E-4215-A87A-5BCBBD327DF9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E28B061-0E3E-4215-A87A-5BCBBD327DF9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F851091F-DF83-4D6F-B2F2-D709C962B6BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F851091F-DF83-4D6F-B2F2-D709C962B6BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F851091F-DF83-4D6F-B2F2-D709C962B6BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F851091F-DF83-4D6F-B2F2-D709C962B6BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AB788CD9-AC80-4890-ABFA-79BCAF30B0D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AB788CD9-AC80-4890-ABFA-79BCAF30B0D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AB788CD9-AC80-4890-ABFA-79BCAF30B0D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AB788CD9-AC80-4890-ABFA-79BCAF30B0D9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
