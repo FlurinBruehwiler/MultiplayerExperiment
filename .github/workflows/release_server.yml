@@ -20,4 +20,4 @@ jobs:
         with:
           name: server-release
           path: |
-            publish/*.exe
+            publish/*
