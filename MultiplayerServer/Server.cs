@@ -1,7 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using Common;
-using MemoryPack;
 
 namespace MultiplayerServer;
 
@@ -14,8 +13,7 @@ public class Server
 {
     public static void ListenForConnections(List<Client> clients)
     {
-        var ipEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 51234);
-        var listener = new TcpListener(ipEndpoint);
+        var listener = new TcpListener(IPAddress.Any, 51234);
         listener.Start();
 
         Console.WriteLine("Listening for Clients");

@@ -23,7 +23,7 @@ public partial struct CameraPosition
 
 public class GameState
 {
-    public required DateTimeOffset LastAutoSave;
+    public required DateTimeOffset LastSave;
     public required Camera2D Camera;
     public required List<Tile> Tiles;
 
@@ -55,7 +55,7 @@ public static class Program
             },
             Tiles = [],
             Server = server,
-            LastAutoSave = DateTimeOffset.Now
+            LastSave = DateTimeOffset.Now
         };
 
         LoadFromDisk(gameState);
@@ -112,6 +112,8 @@ public static class Program
                         });
 
         File.WriteAllBytes(GetSavePath(), data);
+
+        gameState.LastSave = DateTimeOffset.Now;
     }
 
     private static string GetSavePath()
@@ -131,8 +133,7 @@ public static class Program
 
         HandleTilePlacement(gameState);
 
-        //auto save
-        AutoSave(gameState);
+        SaveSystem(gameState);
 
         //drawing
         Raylib.BeginDrawing();
@@ -148,13 +149,17 @@ public static class Program
         Raylib.EndDrawing();
     }
 
-    private static void AutoSave(GameState gameState)
+    private static void SaveSystem(GameState gameState)
     {
-        if ((DateTimeOffset.Now - gameState.LastAutoSave).TotalSeconds > 5)
+        if ((DateTimeOffset.Now - gameState.LastSave).TotalSeconds > 5)
         {
-            Console.WriteLine("AutoSave: Save to file");
+            Console.WriteLine("AutoSave");
             SafeToDisk(gameState);
-            gameState.LastAutoSave = DateTimeOffset.Now;
+        }
+        else if(Raylib.IsKeyDown(KeyboardKey.KEY_LEFT_CONTROL) && Raylib.IsKeyPressed(KeyboardKey.KEY_S))
+        {
+            Console.WriteLine("Manual Save");
+            SafeToDisk(gameState);
         }
     }
 
@@ -227,6 +232,16 @@ public static class Program
 
     private static Vector2<int> GetTilePositionContaining(Vector2 floatVec)
     {
+        // if (floatVec.Y < 0)
+        // {
+        //     floatVec.Y--;
+        // }
+        //
+        // if (floatVec.X < 0)
+        // {
+        //     floatVec.X--;
+        // }
+
         return new Vector2<int>((int)(floatVec.X / TileSize), (int)(floatVec.Y / TileSize));
     }
 

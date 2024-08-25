@@ -16,7 +16,7 @@ public static class Multiplayer
 {
     public static Server? Run()
     {
-        var ipEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 51234);
+        var ipEndpoint = new IPEndPoint(IPAddress.Parse("98.71.24.184"), 51234);
 
         var tcpClient = new TcpClient();
 
