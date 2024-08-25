@@ -1,39 +1,17 @@
 ﻿using System.Numerics;
 using Common;
-using MemoryPack;
 using Raylib_CsLo;
 
 namespace MultiplayerClient;
-
-[MemoryPackable]
-public partial class SaveState
-{
-    public required List<Tile> Tiles;
-    public CameraPosition CameraPosition;
-}
-
-[MemoryPackable]
-public partial struct CameraPosition
-{
-    public Vector2 offset;
-    public Vector2 target;
-    public float rotation;
-    public float zoom;
-}
 
 public class GameState
 {
     public required DateTimeOffset LastSave;
     public required Camera2D Camera;
-    public required List<Tile> Tiles;
+    // public required List<Tile> Tiles;
+    public required SaveState SaveState;
 
     public required Server? Server;
-}
-
-[MemoryPackable]
-public partial struct Tile
-{
-    public required Vector2<int> Position;
 }
 
 public static class Program
@@ -53,12 +31,22 @@ public static class Program
                 target = Vector2.Zero,
                 rotation = 0
             },
-            Tiles = [],
+            SaveState = new SaveState
+            {
+                Tiles = []
+            },
             Server = server,
             LastSave = DateTimeOffset.Now
         };
 
-        LoadFromDisk(gameState);
+        if (server is null)
+        {
+            var saveState = SaveSystem.LoadFromDisk();
+            if (saveState != null)
+            {
+                gameState.SaveState = saveState;
+            }
+        }
 
         Raylib.SetConfigFlags(ConfigFlags.FLAG_WINDOW_RESIZABLE);
         Raylib.InitWindow(900, 450, "MultiplayerExperiment");
@@ -70,55 +58,6 @@ public static class Program
         {
             Frame(gameState);
         }
-    }
-
-    private static void LoadFromDisk(GameState gameState)
-    {
-        var path = GetSavePath();
-
-        if (!File.Exists(path))
-        {
-            return;
-        }
-
-        var data = File.ReadAllBytes(path);
-        var saveState = MemoryPackSerializer.Deserialize<SaveState>(data);
-
-        if (saveState is null)
-            return;
-
-        gameState.Tiles = saveState.Tiles;
-        gameState.Camera = new Camera2D
-        {
-            zoom = saveState.CameraPosition.zoom,
-            rotation = saveState.CameraPosition.rotation,
-            offset = saveState.CameraPosition.offset,
-            target = saveState.CameraPosition.target,
-        };
-    }
-
-    private static void SafeToDisk(GameState gameState)
-    {
-        var data = MemoryPackSerializer.Serialize(new SaveState
-                        {
-                            Tiles = gameState.Tiles,
-                            CameraPosition = new CameraPosition
-                            {
-                                offset = gameState.Camera.offset,
-                                rotation = gameState.Camera.rotation,
-                                target = gameState.Camera.target,
-                                zoom = gameState.Camera.zoom
-                            }
-                        });
-
-        File.WriteAllBytes(GetSavePath(), data);
-
-        gameState.LastSave = DateTimeOffset.Now;
-    }
-
-    private static string GetSavePath()
-    {
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "level.dat");
     }
 
     private static void Frame(GameState gameState)
@@ -133,7 +72,10 @@ public static class Program
 
         HandleTilePlacement(gameState);
 
-        SaveSystem(gameState);
+        if (gameState.Server == null)
+        {
+            RunSaveSystem(gameState);
+        }
 
         //drawing
         Raylib.BeginDrawing();
@@ -149,17 +91,19 @@ public static class Program
         Raylib.EndDrawing();
     }
 
-    private static void SaveSystem(GameState gameState)
+    private static void RunSaveSystem(GameState gameState)
     {
         if ((DateTimeOffset.Now - gameState.LastSave).TotalSeconds > 5)
         {
             Console.WriteLine("AutoSave");
-            SafeToDisk(gameState);
+            SaveSystem.SafeToDisk(gameState.SaveState);
+            gameState.LastSave = DateTimeOffset.Now;
         }
         else if(Raylib.IsKeyDown(KeyboardKey.KEY_LEFT_CONTROL) && Raylib.IsKeyPressed(KeyboardKey.KEY_S))
         {
             Console.WriteLine("Manual Save");
-            SafeToDisk(gameState);
+            SaveSystem.SafeToDisk(gameState.SaveState);
+            gameState.LastSave = DateTimeOffset.Now;
         }
     }
 
@@ -170,25 +114,13 @@ public static class Program
 
         while (gameState.Server.MessagesToProcess.TryTake(out var message))
         {
-            var idx = gameState.Tiles.FindIndex(x => x.Position == message.Tile);
-
-            if (idx == -1 && message.Enabled)
-            {
-                gameState.Tiles.Add(new Tile
-                {
-                    Position = message.Tile
-                });
-            }
-            else if(idx != -1 && !message.Enabled)
-            {
-                gameState.Tiles.RemoveAt(idx);
-            }
+            SaveSystem.UpdateStateWithMessage(ref gameState.SaveState, message);
         }
     }
 
     private static void DrawWorld(GameState gameState)
     {
-        foreach (var tile in gameState.Tiles)
+        foreach (var tile in gameState.SaveState.Tiles)
         {
             const float gap = 1;
 
@@ -204,11 +136,11 @@ public static class Program
         {
             var clickedTile = GetTilePositionContaining(Raylib.GetScreenToWorld2D(Raylib.GetMousePosition(), gameState.Camera));
 
-            var idx = gameState.Tiles.FindIndex(x => x.Position == clickedTile);
+            var idx = gameState.SaveState.Tiles.FindIndex(x => x.Position == clickedTile);
 
             if (idx == -1)
             {
-                gameState.Tiles.Add(new Tile
+                gameState.SaveState.Tiles.Add(new Tile
                 {
                     Position = clickedTile
                 });
@@ -220,7 +152,7 @@ public static class Program
             }
             else
             {
-                gameState.Tiles.RemoveAt(idx);
+                gameState.SaveState.Tiles.RemoveAt(idx);
                 gameState.Server?.MessagesToSend.Add(new Message
                 {
                     Tile = clickedTile,

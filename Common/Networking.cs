@@ -5,8 +5,11 @@ namespace Common;
 
 public static class Networking
 {
-    public static unsafe void SendMessage(TcpClient tcpClient, Message message)
+    public static unsafe bool SendMessage(TcpClient tcpClient, IMessage message)
     {
+        if(!tcpClient.Connected)
+            return false;
+
         var binaryMessage = MemoryPackSerializer.Serialize(message);
 
         var stream = tcpClient.GetStream();
@@ -16,10 +19,18 @@ public static class Networking
         stream.Write(new Span<byte>(&length, 4));
 
         stream.Write(binaryMessage);
+
+        return true;
     }
 
-    public static async ValueTask<Message> GetNextMessage(TcpClient tcpClient)
+    public static async ValueTask<IMessage?> GetNextMessage(TcpClient tcpClient)
     {
+        if (!tcpClient.Client.Connected)
+        {
+            await Task.Delay(100);
+            return null;
+        }
+
         var stream = tcpClient.GetStream();
 
         byte[] header = new byte[4]; //todo pool
@@ -33,7 +44,7 @@ public static class Networking
 
         await stream.ReadExactlyAsync(messageAsBytes);
 
-        return MemoryPackSerializer.Deserialize<Message>(messageAsBytes);
+        return MemoryPackSerializer.Deserialize<IMessage>(messageAsBytes);
     }
 
     private static unsafe int ConvertToInt(byte[] array)

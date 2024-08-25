@@ -7,8 +7,8 @@ namespace MultiplayerClient;
 
 public class Server
 {
-    public required BlockingCollection<Message> MessagesToSend;
-    public required ConcurrentBag<Message> MessagesToProcess;
+    public required BlockingCollection<IMessage> MessagesToSend;
+    public required ConcurrentBag<IMessage> MessagesToProcess;
     public required TcpClient TcpClient;
 }
 
@@ -16,7 +16,13 @@ public static class Multiplayer
 {
     public static Server? Run()
     {
-        var ipEndpoint = new IPEndPoint(IPAddress.Parse("98.71.24.184"), 51234);
+#if DEBUG
+        var ip = IPAddress.Parse("127.0.0.1");
+#else
+        var ip = IPAddress.Parse("98.71.24.184");
+#endif
+
+        var ipEndpoint = new IPEndPoint(ip, 51234);
 
         var tcpClient = new TcpClient();
 
@@ -32,8 +38,8 @@ public static class Multiplayer
 
         var server = new Server
         {
-            MessagesToSend = new BlockingCollection<Message>(),
-            MessagesToProcess = new ConcurrentBag<Message>(),
+            MessagesToSend = new BlockingCollection<IMessage>(),
+            MessagesToProcess = new ConcurrentBag<IMessage>(),
             TcpClient = tcpClient
         };
 
@@ -45,25 +51,21 @@ public static class Multiplayer
         sendThread.Start();
 
         //listen
-        var listenThread = new Thread(() => ReceiveMessageThread(server))
-        {
-            IsBackground = true
-        };
-        listenThread.Start();
+        _ = Task.Run(() => ReceiveMessageThread(server));
 
         return server;
     }
 
-    private static unsafe void ReceiveMessageThread(Server server)
+    private static async Task ReceiveMessageThread(Server server)
     {
         while (true)
         {
-            var message = Networking.GetNextMessage(server.TcpClient).GetAwaiter().GetResult();
+            var message = await Networking.GetNextMessage(server.TcpClient);
             server.MessagesToProcess.Add(message);
         }
     }
 
-    private static unsafe void SendMessageThread(Server server)
+    private static void SendMessageThread(Server server)
     {
         while (true)
         {
@@ -71,7 +73,12 @@ public static class Multiplayer
 
             Console.WriteLine($"Sending message {message}");
 
-            Networking.SendMessage(server.TcpClient, message);
+            if (!Networking.SendMessage(server.TcpClient, message))
+            {
+                //adding was unsuccessful, adding back to the collection and wait
+                server.MessagesToSend.Add(message);
+                Thread.Sleep(100);
+            }
         }
     }
 }

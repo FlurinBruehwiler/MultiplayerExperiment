@@ -9,10 +9,27 @@ public struct Client
     public TcpClient TcpClient;
 }
 
+public class ServerState
+{
+    public required DateTimeOffset LastSave;
+    public required SaveState SaveState;
+    public required List<Client> Clients;
+}
+
 public class Server
 {
-    public static void ListenForConnections(List<Client> clients)
+    public static void ListenForConnections()
     {
+        var serverState = new ServerState
+        {
+            LastSave = DateTimeOffset.Now,
+            SaveState = new SaveState
+            {
+                Tiles = []
+            },
+            Clients = []
+        };
+
         var listener = new TcpListener(IPAddress.Any, 51234);
         listener.Start();
 
@@ -29,29 +46,40 @@ public class Server
                 TcpClient = tcpClient
             };
 
-            clients.Add(client);
+            serverState.Clients.Add(client);
 
-            ListenForMessages(clients, client).ContinueWith(_ => clients.Remove(client));
+            ListenForMessages(serverState, client).ContinueWith(_ =>
+            {
+                Console.WriteLine("Client disconnected");
+                return serverState.Clients.Remove(client);
+            });
         }
     }
 
-    private static async Task ListenForMessages(List<Client> clients, Client client)
+    private static async Task ListenForMessages(ServerState serverState, Client client)
     {
         Console.WriteLine("Listening for messages");
+
+        Networking.SendMessage(client.TcpClient, serverState.SaveState);
 
         while (client.TcpClient.Connected)
         {
             var message = await Networking.GetNextMessage(client.TcpClient);
 
+            if(message is null)
+                continue;
+
+            SaveSystem.UpdateStateWithMessage(ref serverState.SaveState, message);
+
             Console.WriteLine($"Got the message: {message}");
 
-            PublishMessageToClients(message, clients);
+            PublishMessageToClients(message, serverState.Clients);
         }
 
         Console.WriteLine("Stop listening for messages");
     }
 
-    private static void PublishMessageToClients(Message message, List<Client> clients)
+    private static void PublishMessageToClients(IMessage message, List<Client> clients)
     {
         foreach (var client in clients)
         {

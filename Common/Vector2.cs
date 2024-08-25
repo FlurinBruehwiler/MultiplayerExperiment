@@ -4,7 +4,12 @@ using MemoryPack;
 namespace Common;
 
 [MemoryPackable]
-public partial struct Message
+[MemoryPackUnion(0, typeof(Message))]
+[MemoryPackUnion(1, typeof(SaveState))]
+public partial interface IMessage;
+
+[MemoryPackable]
+public partial class Message : IMessage
 {
     public Vector2<int> Tile;
     public bool Enabled;
