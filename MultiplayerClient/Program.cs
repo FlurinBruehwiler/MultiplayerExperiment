@@ -1,17 +1,37 @@
 ﻿using System.Numerics;
 using Common;
+using MemoryPack;
 using Raylib_CsLo;
 
 namespace MultiplayerClient;
 
-public class GameState
+[MemoryPackable]
+public partial class SaveState
 {
-    public required Camera2D Camera;
     public required List<Tile> Tiles;
-    public required Server Server;
+    public CameraPosition CameraPosition;
 }
 
-public struct Tile
+[MemoryPackable]
+public partial struct CameraPosition
+{
+    public Vector2 offset;
+    public Vector2 target;
+    public float rotation;
+    public float zoom;
+}
+
+public class GameState
+{
+    public required DateTimeOffset LastAutoSave;
+    public required Camera2D Camera;
+    public required List<Tile> Tiles;
+
+    public required Server? Server;
+}
+
+[MemoryPackable]
+public partial struct Tile
 {
     public required Vector2<int> Position;
 }
@@ -34,8 +54,11 @@ public static class Program
                 rotation = 0
             },
             Tiles = [],
-            Server = server
+            Server = server,
+            LastAutoSave = DateTimeOffset.Now
         };
+
+        LoadFromDisk(gameState);
 
         Raylib.SetConfigFlags(ConfigFlags.FLAG_WINDOW_RESIZABLE);
         Raylib.InitWindow(900, 450, "MultiplayerExperiment");
@@ -49,14 +72,67 @@ public static class Program
         }
     }
 
+    private static void LoadFromDisk(GameState gameState)
+    {
+        var path = GetSavePath();
+
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        var data = File.ReadAllBytes(path);
+        var saveState = MemoryPackSerializer.Deserialize<SaveState>(data);
+
+        if (saveState is null)
+            return;
+
+        gameState.Tiles = saveState.Tiles;
+        gameState.Camera = new Camera2D
+        {
+            zoom = saveState.CameraPosition.zoom,
+            rotation = saveState.CameraPosition.rotation,
+            offset = saveState.CameraPosition.offset,
+            target = saveState.CameraPosition.target,
+        };
+    }
+
+    private static void SafeToDisk(GameState gameState)
+    {
+        var data = MemoryPackSerializer.Serialize(new SaveState
+                        {
+                            Tiles = gameState.Tiles,
+                            CameraPosition = new CameraPosition
+                            {
+                                offset = gameState.Camera.offset,
+                                rotation = gameState.Camera.rotation,
+                                target = gameState.Camera.target,
+                                zoom = gameState.Camera.zoom
+                            }
+                        });
+
+        File.WriteAllBytes(GetSavePath(), data);
+    }
+
+    private static string GetSavePath()
+    {
+        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "level.dat");
+    }
+
     private static void Frame(GameState gameState)
     {
         //input handling
         HandleNavigation(ref gameState.Camera);
 
-        HandleNetworkMessages(gameState);
+        if (gameState.Server != null)
+        {
+            HandleNetworkMessages(gameState);
+        }
 
         HandleTilePlacement(gameState);
+
+        //auto save
+        AutoSave(gameState);
 
         //drawing
         Raylib.BeginDrawing();
@@ -72,8 +148,21 @@ public static class Program
         Raylib.EndDrawing();
     }
 
+    private static void AutoSave(GameState gameState)
+    {
+        if ((DateTimeOffset.Now - gameState.LastAutoSave).TotalSeconds > 5)
+        {
+            Console.WriteLine("AutoSave: Save to file");
+            SafeToDisk(gameState);
+            gameState.LastAutoSave = DateTimeOffset.Now;
+        }
+    }
+
     private static void HandleNetworkMessages(GameState gameState)
     {
+        if (gameState.Server == null)
+            return;
+
         while (gameState.Server.MessagesToProcess.TryTake(out var message))
         {
             var idx = gameState.Tiles.FindIndex(x => x.Position == message.Tile);
@@ -118,7 +207,7 @@ public static class Program
                 {
                     Position = clickedTile
                 });
-                gameState.Server.MessagesToSend.Add(new Message
+                gameState.Server?.MessagesToSend.Add(new Message
                 {
                     Tile = clickedTile,
                     Enabled = true
@@ -127,7 +216,7 @@ public static class Program
             else
             {
                 gameState.Tiles.RemoveAt(idx);
-                gameState.Server.MessagesToSend.Add(new Message
+                gameState.Server?.MessagesToSend.Add(new Message
                 {
                     Tile = clickedTile,
                     Enabled = false
@@ -168,7 +257,7 @@ public static class Program
             // Zoom increment
             const float zoomIncrement = 0.125f;
 
-            camera.zoom += (wheel*zoomIncrement);
+            camera.zoom += wheel * zoomIncrement;
             if (camera.zoom < zoomIncrement) camera.zoom = zoomIncrement;
         }
     }

@@ -14,13 +14,21 @@ public class Server
 
 public static class Multiplayer
 {
-    public static Server Run()
+    public static Server? Run()
     {
         var ipEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 51234);
 
         var tcpClient = new TcpClient();
 
-        tcpClient.Connect(ipEndpoint);
+        try
+        {
+            tcpClient.Connect(ipEndpoint);
+        }
+        catch
+        {
+            Console.WriteLine("Server not available, using client only");
+            return null;
+        }
 
         var server = new Server
         {
