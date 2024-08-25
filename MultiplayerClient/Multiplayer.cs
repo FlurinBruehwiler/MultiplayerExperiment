@@ -58,9 +58,11 @@ public static class Multiplayer
 
     private static async Task ReceiveMessageThread(Server server)
     {
-        while (true)
+        while (server.TcpClient.Connected)
         {
             var message = await Networking.GetNextMessage(server.TcpClient);
+            if(message is null)
+                continue;
             server.MessagesToProcess.Add(message);
         }
     }
@@ -71,14 +73,12 @@ public static class Multiplayer
         {
             var message = server.MessagesToSend.Take();
 
+            if(!server.TcpClient.Connected)
+                break;
+
             Console.WriteLine($"Sending message {message}");
 
-            if (!Networking.SendMessage(server.TcpClient, message))
-            {
-                //adding was unsuccessful, adding back to the collection and wait
-                server.MessagesToSend.Add(message);
-                Thread.Sleep(100);
-            }
+            Networking.SendMessage(server.TcpClient, message);
         }
     }
 }

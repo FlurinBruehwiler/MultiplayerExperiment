@@ -1,8 +1,17 @@
 ﻿using System.Numerics;
 using Common;
 using Raylib_CsLo;
+using Color = Raylib_CsLo.Color;
+using Rectangle = Raylib_CsLo.Rectangle;
 
 namespace MultiplayerClient;
+
+public enum PlacementState
+{
+    None,
+    Add,
+    Remove
+}
 
 public class GameState
 {
@@ -10,6 +19,7 @@ public class GameState
     public required Camera2D Camera;
     // public required List<Tile> Tiles;
     public required SaveState SaveState;
+    public required PlacementState PlacementState;
 
     public required Server? Server;
 }
@@ -36,7 +46,8 @@ public static class Program
                 Tiles = []
             },
             Server = server,
-            LastSave = DateTimeOffset.Now
+            LastSave = DateTimeOffset.Now,
+            PlacementState = PlacementState.None
         };
 
         if (server is null)
@@ -82,6 +93,8 @@ public static class Program
 
         Raylib.ClearBackground(Raylib.GRAY);
 
+        DrawUi(gameState);
+
         Raylib.BeginMode2D(gameState.Camera);
 
         DrawWorld(gameState);
@@ -89,6 +102,23 @@ public static class Program
         Raylib.EndMode2D();
 
         Raylib.EndDrawing();
+    }
+
+    private static void DrawUi(GameState gameState)
+    {
+        Color textColor = Raylib.BLACK;
+        const int borderOffset = 10;
+        var topOffset = borderOffset;
+
+        string mode = gameState.Server == null ? "local" : gameState.Server.TcpClient.Connected ? "remote" : "remote (disconnected)";
+
+        Raylib.DrawText(mode, borderOffset, topOffset, 20, textColor);
+        topOffset += 30;
+
+        var fps = 1 / Raylib.GetFrameTime();
+
+        Raylib.DrawText($"FPS: {(int)fps}", borderOffset,  topOffset, 20, textColor);
+        topOffset += 30;
     }
 
     private static void RunSaveSystem(GameState gameState)
@@ -132,7 +162,7 @@ public static class Program
 
     private static void HandleTilePlacement(GameState gameState)
     {
-        if (Raylib.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT))
+        if (Raylib.IsMouseButtonDown(MouseButton.MOUSE_BUTTON_LEFT))
         {
             var clickedTile = GetTilePositionContaining(Raylib.GetScreenToWorld2D(Raylib.GetMousePosition(), gameState.Camera));
 
@@ -140,41 +170,56 @@ public static class Program
 
             if (idx == -1)
             {
-                gameState.SaveState.Tiles.Add(new Tile
+                if (gameState.PlacementState != PlacementState.Remove)
                 {
-                    Position = clickedTile
-                });
-                gameState.Server?.MessagesToSend.Add(new Message
-                {
-                    Tile = clickedTile,
-                    Enabled = true
-                });
+                    gameState.PlacementState = PlacementState.Add;
+
+                    gameState.SaveState.Tiles.Add(new Tile
+                    {
+                        Position = clickedTile
+                    });
+                    gameState.Server?.MessagesToSend.Add(new Message
+                    {
+                        Tile = clickedTile,
+                        Enabled = true
+                    });
+                }
             }
             else
             {
-                gameState.SaveState.Tiles.RemoveAt(idx);
-                gameState.Server?.MessagesToSend.Add(new Message
+                if (gameState.PlacementState != PlacementState.Add)
                 {
-                    Tile = clickedTile,
-                    Enabled = false
-                });
+                    gameState.PlacementState = PlacementState.Remove;
+
+                    gameState.SaveState.Tiles.RemoveAt(idx);
+                    gameState.Server?.MessagesToSend.Add(new Message
+                    {
+                        Tile = clickedTile,
+                        Enabled = false
+                    });
+                }
             }
+        }
+        else
+        {
+            gameState.PlacementState = PlacementState.None;
         }
     }
 
     private static Vector2<int> GetTilePositionContaining(Vector2 floatVec)
     {
-        // if (floatVec.Y < 0)
-        // {
-        //     floatVec.Y--;
-        // }
-        //
-        // if (floatVec.X < 0)
-        // {
-        //     floatVec.X--;
-        // }
+        var res = new Vector2<int>((int)(floatVec.X / TileSize), (int)(floatVec.Y / TileSize));
+        if (floatVec.Y < 0)
+        {
+            res.Y--;
+        }
 
-        return new Vector2<int>((int)(floatVec.X / TileSize), (int)(floatVec.Y / TileSize));
+        if (floatVec.X < 0)
+        {
+            res.X--;
+        }
+
+        return res;
     }
 
     static void HandleNavigation(ref Camera2D camera)
